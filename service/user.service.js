@@ -54,7 +54,6 @@ const registerUserWithVerification = async (userData) => {
         // Generate verification token using crypto utility
         const verificationToken = await generateRandomToken();
 
-        console.log("token",verificationToken);
         const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
         
         // Add verification fields to user data
@@ -377,7 +376,6 @@ const verifyEmail = async (token) => {
             emailVerificationExpiry: { $gt: new Date() }
         });
 
-        console.log("user",user);
 
         if (!user) {
             throw new Error('Invalid or expired verification token');
@@ -390,7 +388,6 @@ const verifyEmail = async (token) => {
             emailVerificationExpiry: undefined
         });
 
-        console.log("update",updatedUser)
 
         return {
             success: true,
@@ -420,7 +417,6 @@ const resendEmailVerification = async (email) => {
 
         // Generate new verification token using crypto utility
         const verificationToken = await generateRandomToken();
-        console.log("token",verificationToken);
         const verificationTokenExpiry = new Date(Date.now() + 10 * 60 * 60 * 1000); // 1 hours
 
         // Update user with new token

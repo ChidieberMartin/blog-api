@@ -122,7 +122,6 @@ const signup = async (req, res, next) => {
             blogs: []
         });
 
-        console.log('User registered successfully:', result.user.name);
 
         //Generate jwt token
         const tokenPayload = {
@@ -131,7 +130,6 @@ const signup = async (req, res, next) => {
             name: result.user.name
         };
         const accessToken = encrypt(tokenPayload);
-        console.log('Result', result);
 
         return res.status(201).json({
             success: true,

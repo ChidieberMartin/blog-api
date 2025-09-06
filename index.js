@@ -17,14 +17,11 @@ const app = express();
 
 // ✅ Global middleware setup (order matters!)
 app.use(setSecurityHeaders); // Security headers first
-// app.use(cors({
-//     origin: process.env.CLIENT_URL || 'http://localhost:3000',
-//     credentials: true // Important for cookies
-// }));
+
 app.use(cors({
   origin: [
     process.env.CLIENT_URL || 'http://localhost:3000',
-    'https://blog-app-psi-nine-25.vercel.app/',  // Your actual Vercel URL
+    'https://blog-aj0kkisy0-martins-projects-bc0a9779.vercel.app/',  // Your actual Vercel URL
   ],
   credentials: true
 }));

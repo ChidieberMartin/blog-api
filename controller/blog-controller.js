@@ -2,27 +2,6 @@ const mongoose = require("mongoose");
 const Blogs = require("../model/blog.js");
 const UserModel = require("../model/user.js");
 
-// const getAllBlogs = async (req, res, next) => {
-//     let blogs;
-//     try {
-//         blogs = await Blogs.find();
-//         console.log("blog", blogs);
-//     } catch (error) {
-//         console.log(error);
-//         return res.status(500).json({
-//             message: "Server error"
-//         });
-//     }
-//     if (!blogs || blogs.length === 0) {
-//         return res.status(404).json({
-//             message: "No Blog Found"
-//         });
-//     }
-//     return res.status(200).json({
-//         blogs
-//     });
-// }
-
 
 // Improved getAllBlogs with pagination and search
 const getAllBlogs = async (req, res, next) => {
@@ -56,7 +35,6 @@ const getAllBlogs = async (req, res, next) => {
         const totalBlogs = await Blogs.countDocuments(searchQuery);
         const totalPages = Math.ceil(totalBlogs / limit);
         
-        console.log("blogs", blogs);
         
         return res.status(200).json({
             success: true,
@@ -100,7 +78,6 @@ const getAllBlogsSimple = async (req, res, next) => {
             .populate('user', 'name email')
             .sort({ createdAt: -1 });
             
-        console.log("blogs", blogs);
         
         if (!blogs || blogs.length === 0) {
             return res.status(200).json({
@@ -164,7 +141,6 @@ const addBlog = async (req, res, next) => {
         user,
     });
 
-    console.log('blogss', blog);
     // Save blog
     await blog.save();
 
