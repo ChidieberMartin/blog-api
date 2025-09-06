@@ -18,9 +18,9 @@ const app = express();
 // ✅ UPDATED CORS configuration with correct Vercel URLs
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3000',
-    'https://blog-app-martins-projects-bc0a9779.vercel.app/',
-    'https://blog-app-git-main-martins-projects-bc0a9779.vercel.app/', 
-    'https://blog-2g4ig3dxl-martins-projects-bc0a9779.vercel.app/',
+    'https://blog-app-martins-projects-bc0a9779.vercel.app',
+    'https://blog-app-git-main-martins-projects-bc0a9779.vercel.app', 
+    'https://blog-2g4ig3dxl-martins-projects-bc0a9779.vercel.app',
     'https://blog-qh2bqckm4-martins-projects-bc0a9779.vercel.app',  // ✅ UPDATED to match your current Vercel URL
     'https://blog-aj0kkisy0-martins-projects-bc0a9779.vercel.app',  // Keep the old one just in case
     'https://blog-2g4lg3dxt-martins-projects-bc0a9779.vercel.app',  // From your domains list
