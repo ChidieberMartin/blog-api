@@ -17,8 +17,8 @@ const app = express();
 
 // ✅ CORS configuration - CRITICAL FIXES
 const allowedOrigins = [
-    process.env.CLIENT_URL || 'http://localhost:3000',
-    'https://blog-aj0kkisy0-martins-projects-bc0a9779.vercel.app',  // ❌ REMOVED trailing slash - this was causing the CORS issue!
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'https://blog-bucx0wq4z-martins-projects-bc0a9779.vercel.app',  // ❌ REMOVED trailing slash - this was causing the CORS issue!
     'http://localhost:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3000'
