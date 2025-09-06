@@ -28,6 +28,7 @@ app.use(cors({
   ],
   credentials: true
 }));
+
 app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 app.use(cookieParser()); // Parse cookies
