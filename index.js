@@ -19,8 +19,8 @@ const app = express();
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'https://blog-app-martins-projects-bc0a9779.vercel.app',
-    // 'https://blog-app-git-main-martins-projects-bc0a9779.vercel.app', 
-    // 'https://blog-2g4ig3dxl-martins-projects-bc0a9779.vercel.app',
+    'https://blog-app-git-main-martins-projects-bc0a9779.vercel.app', 
+    'https://blog-2g4ig3dxl-martins-projects-bc0a9779.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3000'
