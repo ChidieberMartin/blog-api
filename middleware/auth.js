@@ -1,5 +1,5 @@
 const userService = require('../service/user.service');
-const Blogs = require('../model/blog.js');
+const {Blogs,Comments } = require('../model/blog.js');
 const { dcrypt } = require('../utils/crypto');
 
 /**
@@ -72,11 +72,11 @@ const verifyToken = async (req, res, next) => {
 };
 
 /**
- * Middleware to check if user owns the blog they're trying to modify
+ * Middleware to check if user owns theBlogs they're trying to modify
  */
 const checkBlogOwnership = async (req, res, next) => {
     try {
-        const blogId = req.params.id;
+        constBlogsId = req.params.id;
         const userId = req.user._id.toString();
 
         if (!blogId) {
@@ -86,8 +86,8 @@ const checkBlogOwnership = async (req, res, next) => {
             });
         }
 
-        // Find the blog
-        const blog = await Blogs.findById(blogId);
+        // Find theBlogs
+        constBlogs = awaitBlogs.findById(blogId);
 
         if (!blog) {
             return res.status(404).json({
@@ -96,16 +96,16 @@ const checkBlogOwnership = async (req, res, next) => {
             });
         }
 
-        // Check if user owns the blog
+        // Check if user owns theBlogs
         if (blog.user.toString() !== userId) {
             return res.status(403).json({
                 success: false,
-                message: "Access denied. You can only modify your own blogs"
+                message: "Access denied. You can only modify your ownBlogs"
             });
         }
 
-        // Attach blog to request for use in controller
-        req.blog = blog;
+        // AttachBlogs to request for use in controller
+        req.blog =Blogs;
         next();
 
     } catch (error) {
@@ -173,7 +173,7 @@ const checkAdmin = (req, res, next) => {
 const validateBlogData = (req, res, next) => {
     const { title, description, image, user } = req.body;
 
-    // For POST requests (creating blogs)
+    // For POST requests (creatingBlogs)
     if (req.method === 'POST') {
         if (!title || !description || !image || !user) {
             return res.status(400).json({
@@ -183,7 +183,7 @@ const validateBlogData = (req, res, next) => {
         }
     }
 
-    // For PUT requests (updating blogs) - at least one field required
+    // For PUT requests (updatingBlogs) - at least one field required
     if (req.method === 'PUT') {
         if (!title && !description && !image) {
             return res.status(400).json({
@@ -324,6 +324,206 @@ const requestLogger = (req, res, next) => {
     next();
 };
 
+
+// Additional middleware functions for your auth.js file
+
+// ValidateComments data
+const validateCommentData = (req, res, next) => {
+    const { text } = req.body;
+    
+    // Check ifComments text exists
+    if (!text) {
+        return res.status(400).json({
+            success: false,
+            message: "Comment text is required"
+        });
+    }
+    
+    // CheckComments length
+    const trimmedText = text.trim();
+    if (trimmedText.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Comment cannot be empty"
+        });
+    }
+    
+    if (trimmedText.length > 1000) {
+        return res.status(400).json({
+            success: false,
+            message: "Comment cannot exceed 1000 characters"
+        });
+    }
+    
+    // Sanitize the text (remove any potentially harmful content)
+    req.body.text = trimmedText;
+    next();
+};
+
+// CheckComments ownership (for deletingComments)
+const checkCommentOwnership = async (req, res, next) => {
+    try {
+        constCommentsId = req.params.commentId;
+        const userId = req.user.id;
+        
+        // Find theComments and populate theBlogs
+        constComments = awaitComments.findById(commentId).populate('blog');
+        
+        if (!comment) {
+            return res.status(404).json({
+                success: false,
+                message: "Comment not found"
+            });
+        }
+        
+        // Check if user isComments author ORBlogs owner
+        const isCommentAuthor =Comments.user.toString() === userId;
+        const isBlogOwner =Comments.blog.user.toString() === userId;
+        
+        if (!isCommentAuthor && !isBlogOwner) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized: You can only delete your ownComments orComments on yourBlogs"
+            });
+        }
+        
+        // AttachComments to request for use in controller
+        req.comment =Comments;
+        next();
+        
+    } catch (error) {
+        console.error("Error in checkCommentOwnership middleware:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error during authorization check"
+        });
+    }
+};
+
+// Validate share data (optional message)
+const validateShareData = (req, res, next) => {
+    const { shareMessage } = req.body;
+    
+    // Share message is optional, but if provided, validate it
+    if (shareMessage) {
+        const trimmedMessage = shareMessage.trim();
+        
+        if (trimmedMessage.length > 500) {
+            return res.status(400).json({
+                success: false,
+                message: "Share message cannot exceed 500 characters"
+            });
+        }
+        
+        req.body.shareMessage = trimmedMessage;
+    }
+    
+    next();
+};
+
+// Rate limiting specifically for social interactions
+const socialRateLimit = (maxRequests, windowMs, action) => {
+    const requests = new Map();
+    
+    return (req, res, next) => {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required"
+            });
+        }
+        
+        const key = `${userId}-${action}`;
+        const now = Date.now();
+        const windowStart = now - windowMs;
+        
+        // Clean old requests
+        if (requests.has(key)) {
+            const userRequests = requests.get(key).filter(timestamp => timestamp > windowStart);
+            requests.set(key, userRequests);
+        } else {
+            requests.set(key, []);
+        }
+        
+        const userRequests = requests.get(key);
+        
+        if (userRequests.length >= maxRequests) {
+            return res.status(429).json({
+                success: false,
+                message: `Too many ${action} requests. Please try again later.`,
+                retryAfter: Math.ceil(windowMs / 1000)
+            });
+        }
+        
+        // Add current request
+        userRequests.push(now);
+        requests.set(key, userRequests);
+        
+        next();
+    };
+};
+
+// Content moderation middleware (basic profanity filter)
+const moderateContent = (req, res, next) => {
+    const { text, shareMessage } = req.body;
+    const contentToCheck = text || shareMessage;
+    
+    if (contentToCheck) {
+        // Basic profanity filter (you can enhance this with more sophisticated libraries)
+        const profanityWords = ['spam', 'fake', 'scam']; // Add more words as needed
+        const lowerContent = contentToCheck.toLowerCase();
+        
+        const hasProfanity = profanityWords.some(word => lowerContent.includes(word));
+        
+        if (hasProfanity) {
+            return res.status(400).json({
+                success: false,
+                message: "Content contains inappropriate language"
+            });
+        }
+    }
+    
+    next();
+};
+
+// Check if user can interact withBlogs (not blocked, etc.)
+const checkUserInteractionPermissions = async (req, res, next) => {
+    try {
+        constBlogsId = req.params.id;
+        const userId = req.user.id;
+        
+        constBlogs = awaitBlogs.findById(blogId).populate('user', 'blockedUsers');
+        
+        if (!blog) {
+            return res.status(404).json({
+                success: false,
+                message: "Blog not found"
+            });
+        }
+        
+        // Check if user is blocked byBlogs owner (if you implement blocking feature)
+        if (blog.user.blockedUsers &&Blogs.user.blockedUsers.includes(userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not allowed to interact with this content"
+            });
+        }
+        
+        req.blog =Blogs;
+        next();
+        
+    } catch (error) {
+        console.error("Error in checkUserInteractionPermissions middleware:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error during permission check"
+        });
+    }
+};
+
+
+
 module.exports = {
     verifyToken,
     checkBlogOwnership,
@@ -334,5 +534,11 @@ module.exports = {
     validateObjectId,
     rateLimit,
     requireEmailVerification,
-    requestLogger
+    requestLogger,
+    validateCommentData,
+    checkCommentOwnership,
+    validateShareData,
+    socialRateLimit,
+    moderateContent,
+    checkUserInteractionPermissions
 };

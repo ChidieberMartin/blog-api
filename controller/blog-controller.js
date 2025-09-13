@@ -1,53 +1,87 @@
 const mongoose = require("mongoose");
-const Blogs = require("../model/blog.js");
+const {
+    Blogs,
+    Comments
+} = require("../model/blog.js");
 const UserModel = require("../model/user.js");
 
-
-// Improved getAllBlogs with pagination and search
+// Get all Blogss with social data
 const getAllBlogs = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const search = req.query.search || '';
-        
-        // Calculate skip value for pagination
+        const userId = req.user?.id; // Get current user ID from auth middleware
+
         const skip = (page - 1) * limit;
-        
-        // Build search query
+
         let searchQuery = {};
         if (search) {
             searchQuery = {
-                $or: [
-                    { title: { $regex: search, $options: 'i' } },
-                    { description: { $regex: search, $options: 'i' } }
+                $or: [{
+                        title: {
+                            $regex: search,
+                            $options: 'i'
+                        }
+                    },
+                    {
+                        description: {
+                            $regex: search,
+                            $options: 'i'
+                        }
+                    }
                 ]
             };
         }
-        
-        // Get blogs with pagination and populate user data
-        const blogs = await Blogs.find(searchQuery)
-            .populate('user', 'name email') // Populate user info
-            .sort({ createdAt: -1 }) // Sort by newest first
+
+        const Blogss = await Blogs.find(searchQuery)
+            .populate('user', 'name email avatar')
+            .populate({
+                path: 'comments',
+                populate: {
+                    path: 'user',
+                    select: 'name email avatar'
+                },
+                options: {
+                    sort: {
+                        createdAt: -1
+                    },
+                    limit: 3
+                } // Get latest 3Commentss
+            })
+            .populate('likes.user', 'name email')
+            .populate('shares.user', 'name email')
+            .sort({
+                createdAt: -1
+            })
             .skip(skip)
             .limit(limit);
-            
-        // Get total count for pagination
-        const totalBlogs = await Blogs.countDocuments(searchQuery);
-        const totalPages = Math.ceil(totalBlogs / limit);
-        
-        
+
+        // Add user interaction status for each Blogs
+        const BlogssWithUserStatus = Blogss.map(Blogs => {
+            const BlogsObj = Blogs.toObject();
+            if (userId) {
+                BlogsObj.isLikedByUser = Blogs.likes.some(like => like.user._id.toString() === userId);
+                BlogsObj.isSharedByUser = Blogs.shares.some(share => share.user._id.toString() === userId);
+            }
+            return BlogsObj;
+        });
+
+        const totalBlogss = await Blogs.countDocuments(searchQuery);
+        const totalPages = Math.ceil(totalBlogss / limit);
+
         return res.status(200).json({
             success: true,
-            blogs,
+            Blogss: BlogssWithUserStatus,
             pagination: {
                 currentPage: page,
                 totalPages,
-                totalBlogs,
+                totalBlogss,
                 hasNextPage: page < totalPages,
                 hasPrevPage: page > 1
             }
         });
-        
+
     } catch (error) {
         console.log(error);
         return res.status(500).json({
@@ -58,40 +92,51 @@ const getAllBlogs = async (req, res, next) => {
     }
 }
 
-// Alternative: Simple version that matches your current structure
+
 const getAllBlogsSimple = async (req, res, next) => {
     try {
         const search = req.query.search || '';
-        
+
         // Build search query
         let searchQuery = {};
         if (search) {
             searchQuery = {
-                $or: [
-                    { title: { $regex: search, $options: 'i' } },
-                    { description: { $regex: search, $options: 'i' } }
+                $or: [{
+                        title: {
+                            $regex: search,
+                            $options: 'i'
+                        }
+                    },
+                    {
+                        description: {
+                            $regex: search,
+                            $options: 'i'
+                        }
+                    }
                 ]
             };
         }
-        
-        const blogs = await Blogs.find(searchQuery)
+
+        const Blogss = await Blogss.find(searchQuery)
             .populate('user', 'name email')
-            .sort({ createdAt: -1 });
-            
-        
-        if (!blogs || blogs.length === 0) {
+            .sort({
+                createdAt: -1
+            });
+
+
+        if (!Blogss || Blogss.length === 0) {
             return res.status(200).json({
                 success: true,
-                blogs: [],
-                message: "No blogs found"
+                Blogss: [],
+                message: "No Blogss found"
             });
         }
-        
+
         return res.status(200).json({
             success: true,
-            blogs
+            Blogss
         });
-        
+
     } catch (error) {
         console.log(error);
         return res.status(500).json({
@@ -102,19 +147,365 @@ const getAllBlogsSimple = async (req, res, next) => {
     }
 }
 
+// Like/Unlike a Blogs
+const toggleLike = async (req, res, next) => {
+    try {
+        const BlogsId = req.params.id;
+        const userId = req.user.id; // From auth middleware
+
+        const Blogs = await Blogs.findById(BlogsId);
+        if (!Blogs) {
+            return res.status(404).json({
+                success: false,
+                message: "Blogs not found"
+            });
+        }
+
+        const existingLikeIndex = Blogs.likes.findIndex(like =>
+            like.user.toString() === userId
+        );
+
+        let isLiked;
+        if (existingLikeIndex > -1) {
+            // Unlike - remove like
+            Blogs.likes.splice(existingLikeIndex, 1);
+            Blogs.likesCount = Math.max(0, Blogs.likesCount - 1);
+            isLiked = false;
+        } else {
+            // Like - add like
+            Blogs.likes.push({
+                user: userId
+            });
+            Blogs.likesCount += 1;
+            isLiked = true;
+        }
+
+        await Blogs.save();
+
+        return res.status(200).json({
+            success: true,
+            isLiked,
+            likesCount: Blogs.likesCount,
+            message: isLiked ? "Blogs liked" : "Blogs unliked"
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+}
+
+// AddComments to a Blogs
+const addComment = async (req, res, next) => {
+    try {
+        const BlogsId = req.params.id;
+        const {
+            text
+        } = req.body;
+        const userId = req.user.id;
+
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Comment text is required"
+            });
+        }
+
+        const Blogs = await Blogs.findById(BlogsId);
+        if (!Blogs) {
+            return res.status(404).json({
+                success: false,
+                message: "Blogs not found"
+            });
+        }
+
+        constComments = newComments({
+            text: text.trim(),
+            user: userId,
+            Blogs: BlogsId
+        });
+
+        awaitComments.save();
+
+        // AddComments reference to Blogs and update counter
+        Blogs.comments.push(comment._id);
+        Blogs.commentsCount += 1;
+        await Blogs.save();
+
+        // PopulateComments with user data before returning
+        awaitComments.populate('user', 'name email avatar');
+
+        return res.status(201).json({
+            success: true,
+            Commentssssssssssss,
+            message: "Comment added successfully"
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+}
+
+// Reply to aComments
+const replyToComment = async (req, res, next) => {
+    try {
+        constCommentsId = req.params.commentId;
+        const {
+            text
+        } = req.body;
+        const userId = req.user.id;
+
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Reply text is required"
+            });
+        }
+
+        constComments = awaitComments.findById(commentId);
+        if (!comment) {
+            return res.status(404).json({
+                success: false,
+                message: "Comment not found"
+            });
+        }
+
+        const reply = {
+            text: text.trim(),
+            user: userId,
+            createdAt: new Date()
+        };
+
+        Commentssssssss.replies.push(reply);
+        awaitComments.save();
+
+        // Populate the reply user data
+        awaitComments.populate('replies.user', 'name email avatar');
+
+        return res.status(201).json({
+            success: true,
+            reply: Comments.replies[comment.replies.length - 1],
+            message: "Reply added successfully"
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+}
+
+// Share a Blogs
+const shareBlog = async (req, res, next) => {
+    try {
+        const BlogsId = req.params.id;
+        const {
+            shareMessage
+        } = req.body;
+        const userId = req.user.id;
+
+        const Blogs = await Blogs.findById(BlogsId);
+        if (!Blogs) {
+            return res.status(404).json({
+                success: false,
+                message: "Blogs not found"
+            });
+        }
+
+        // Check if user already shared this Blogs
+        const existingShare = Blogs.shares.find(share =>
+            share.user.toString() === userId
+        );
+
+        if (existingShare) {
+            return res.status(400).json({
+                success: false,
+                message: "You have already shared this Blogs"
+            });
+        }
+
+        const share = {
+            user: userId,
+            shareMessage: shareMessage?.trim() || '',
+            sharedAt: new Date()
+        };
+
+        Blogs.shares.push(share);
+        Blogs.sharesCount += 1;
+        await Blogs.save();
+
+        return res.status(201).json({
+            success: true,
+            sharesCount: Blogs.sharesCount,
+            message: "Blogs shared successfully"
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+}
+
+// Get allCommentss for a Blogs
+const getBlogComments = async (req, res, next) => {
+    try {
+        const BlogsId = req.params.id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const Comments = awaitComments.find({
+                Blogs: BlogsId
+            })
+            .populate('user', 'name email avatar')
+            .populate('replies.user', 'name email avatar')
+            .sort({
+                createdAt: -1
+            })
+            .skip(skip)
+            .limit(limit);
+
+        const totalComments = awaitComments.countDocuments({
+            Blogs: BlogsId
+        });
+        const totalPages = Math.ceil(totalComments / limit);
+
+        return res.status(200).json({
+            success: true,
+            Comments,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                totalComments,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1
+            }
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+}
+
+// DeleteComments (only byComments author or Blogs owner)
+const deleteComment = async (req, res, next) => {
+    try {
+        constCommentsId = req.params.commentId;
+        const userId = req.user.id;
+
+        constComments = awaitComments.findById(commentId).populate('Blogs');
+        if (!comment) {
+            return res.status(404).json({
+                success: false,
+                message: "Comment not found"
+            });
+        }
+
+        // Check if user isComments author or Blogs owner
+        const isCommentAuthor = Comments.user.toString() === userId;
+        const isBlogsOwner = Comments.Blogs.user.toString() === userId;
+
+        if (!isCommentAuthor && !isBlogsOwner) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized to delete thisComments"
+            });
+        }
+
+        // RemoveComments from Blogs and update counter
+        await Blogs.findByIdAndUpdate(comment.Blogs._id, {
+            $pull: {
+                Commentss: CommentsId
+            },
+            $inc: {
+                CommentssCount: -1
+            }
+        });
+
+        awaitComments.findByIdAndDelete(commentId);
+
+        return res.status(200).json({
+            success: true,
+            message: "Comment deleted successfully"
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+}
+
+// Get Blogs likes
+const getBlogLikes = async (req, res, next) => {
+    try {
+        const BlogsId = req.params.id;
+
+        const Blogs = await Blogs.findById(BlogsId)
+            .populate('likes.user', 'name email avatar')
+            .select('likes likesCount');
+
+        if (!Blogs) {
+            return res.status(404).json({
+                success: false,
+                message: "Blogs not found"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            likes: Blogs.likes,
+            likesCount: Blogs.likesCount
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
+}
+
+// Your existing functions (updated to use new schema)
 const addBlog = async (req, res, next) => {
     const {
         title,
         description,
         image,
         user
-    } = req.body; // Fixed: "discription" -> "description"
+    } = req.body;
 
     if (!title || !description || !image || !user) {
         return res.status(400).json({
             success: false,
             message: "Incomplete credentials"
-        }); // Added return
+        });
     }
 
     let existingUser;
@@ -134,87 +525,38 @@ const addBlog = async (req, res, next) => {
         });
     }
 
-    const blog = new Blogs({
+    const Blogs = new Blogs({
         title,
         description,
         image,
         user,
     });
 
-    // Save blog
-    await blog.save();
-
-    // Push blog ref into user
-    existingUser.blogs.push(blog);
+    await Blogs.save();
+    existingUser.Blogss.push(Blogs);
     await existingUser.save();
 
-    // let session;
-    // try {
-    //     session = await mongoose.startSession();
-    //     session.startTransaction();
-    //     await blog.save({ session });
-    //     existingUser.blogs.push(blog); // Fixed: "exitingUser" -> "existingUser"
-    //     console.log("existingUser", existingUser);
-    //     console.log("blog", blog);  
-    //     await existingUser.save({ session }); // Added session
-    //     await session.commitTransaction();
-    // } catch (error) {
-    //     if (session) {
-    //         await session.abortTransaction();
-    //     }
-    //     console.log(error);
-    //     return res.status(500).json({ message: error.message });
-    // } finally {
-    //     if (session) {
-    //         session.endSession();
-    //     }
-    // }
-
     return res.status(201).json({
-        success:true,
-        blog
-    }); // Changed to 201 for created resource
-}
-
-const updateBlog = async (req, res, next) => { // Fixed: parameter order (req, res, not res, req)
-    const {
-        title,
-        description
-    } = req.body; // Fixed: "discription" -> "description"
-    const blogId = req.params.id;
-    let blog;
-
-    try {
-        blog = await Blogs.findByIdAndUpdate(blogId, {
-            title,
-            description // Fixed: "discription" -> "description"
-        }, {
-            new: true
-        }); // Added { new: true } to return updated document
-    } catch (error) {
-        console.log(error);
-        return res.status(500).json({
-            message: "Server error"
-        });
-    }
-
-    if (!blog) {
-        return res.status(404).json({
-            message: "Blog not found"
-        }); // Added return and better message
-    }
-
-    return res.status(200).json({
-        blog
+        success: true,
+        Blogs
     });
 }
 
-const getById = async (req, res, next) => { // Fixed: "rea" -> "req"
-    const id = req.params.id;
-    let blog;
+const updateBlog = async (req, res, next) => {
+    const {
+        title,
+        description
+    } = req.body;
+    const BlogsId = req.params.id;
+    let Blogs;
 
     try {
-        blog = await Blogs.findById(id).populate("user", "name email"); 
+        Blogs = await Blogs.findByIdAndUpdate(BlogsId, {
+            title,
+            description
+        }, {
+            new: true
+        });
     } catch (error) {
         console.log(error);
         return res.status(500).json({
@@ -222,26 +564,82 @@ const getById = async (req, res, next) => { // Fixed: "rea" -> "req"
         });
     }
 
-    if (!blog) {
+    if (!Blogs) {
         return res.status(404).json({
-            message: "No Blog Found"
-        }); // Added return
+            message: "Blogs not found"
+        });
     }
 
     return res.status(200).json({
-        blog
+        Blogs
+    });
+}
+
+const getById = async (req, res, next) => {
+    const id = req.params.id;
+    const userId = req.user?.id;
+    let Blogs;
+
+    try {
+        Blogs = await Blogs.findById(id)
+            .populate('user', 'name email avatar')
+            .populate({
+                path: 'comments',
+                populate: {
+                    path: 'user',
+                    select: 'name email avatar'
+                },
+                options: {
+                    sort: {
+                        createdAt: -1
+                    },
+                    limit: 5
+                }
+            })
+            .populate('likes.user', 'name email')
+            .populate('shares.user', 'name email');
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+
+    if (!Blogs) {
+        return res.status(404).json({
+            message: "No Blogs Found"
+        });
+    }
+
+    // Add user interaction status
+    const BlogsObj = Blogs.toObject();
+    if (userId) {
+        BlogsObj.isLikedByUser = Blogs.likes.some(like => like.user._id.toString() === userId);
+        BlogsObj.isSharedByUser = Blogs.shares.some(share => share.user._id.toString() === userId);
+    }
+
+    return res.status(200).json({
+        Blogs: BlogsObj
     });
 }
 
 const deleteBlog = async (req, res, next) => {
     const id = req.params.id;
-    let blog;
+    let Blogs;
 
     try {
-        blog = await Blogs.findByIdAndDelete(id).populate('user'); // Changed from findByIdAndRemove (deprecated)
-        if (blog && blog.user) {
-            await blog.user.blogs.pull(blog);
-            await blog.user.save();
+        Blogs = await Blogs.findByIdAndDelete(id).populate('user');
+        if (Blogs) {
+            // Delete allCommentss for this Blogs
+            awaitComments.deleteMany({
+                Blogs: id
+            });
+
+            // Remove Blogs from user's Blogss array
+            if (Blogs.user) {
+                await Blogs.user.Blogss.pull(Blogs);
+                await Blogs.user.save();
+            }
         }
     } catch (error) {
         console.log(error);
@@ -250,23 +648,29 @@ const deleteBlog = async (req, res, next) => {
         });
     }
 
-    if (!blog) {
+    if (!Blogs) {
         return res.status(404).json({
-            message: "Blog not found"
+            message: "Blogs not found"
         });
     }
 
     return res.status(200).json({
         message: 'Successfully deleted'
-    }); // Fixed typo
+    });
 }
 
 const getByUserId = async (req, res, next) => {
     const userId = req.params.id;
-    let userBlogs;
+    let userBlogss;
 
     try {
-        userBlogs = await UserModel.findById(userId).populate('blogs');
+        userBlogss = await UserModel.findById(userId).populate({
+            path: 'Blogss',
+            populate: {
+                path: 'user',
+                select: 'name email avatar'
+            }
+        });
     } catch (error) {
         console.log(error);
         return res.status(500).json({
@@ -274,7 +678,7 @@ const getByUserId = async (req, res, next) => {
         });
     }
 
-    if (!userBlogs) {
+    if (!userBlogss) {
         return res.status(404).json({
             success: false,
             message: 'No user found'
@@ -282,8 +686,8 @@ const getByUserId = async (req, res, next) => {
     }
 
     return res.status(200).json({
-        blogs: userBlogs.blogs
-    }); // Return just the blogs array
+        Blogss: userBlogss.Blogs
+    });
 }
 
 module.exports = {
@@ -293,5 +697,12 @@ module.exports = {
     updateBlog,
     deleteBlog,
     getById,
-    getByUserId
-}
+    getByUserId,
+    toggleLike,
+    addComment,
+    replyToComment,
+    shareBlog,
+    getBlogComments,
+    deleteComment,
+    getBlogLikes
+};
