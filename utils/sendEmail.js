@@ -3,6 +3,7 @@ const path = require('path');
 const dotenv = require('dotenv');
 dotenv.config();
 
+
 class EmailService {
     constructor() {
         this.transporter = null;
@@ -30,7 +31,7 @@ class EmailService {
                 service: 'gmail',
                 auth: {
                     user: process.env.EMAIL_USER || 'your-email@gmail.com',
-                    pass: process.env.EMAIL_PASS || 'your-app-password' // Use app password, not regular password
+                    pass: process.env.EMAIL_PASS || 'your-app-password' 
                 },
                 tls: {
                     rejectUnauthorized: false
