@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
 const dotenv = require('dotenv');
-dotenv.confiq();
+dotenv.config();
 
 class EmailService {
     constructor() {
