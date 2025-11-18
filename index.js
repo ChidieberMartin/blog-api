@@ -19,54 +19,43 @@ const {
 
 const app = express();
 
-app.use(cors({
-    origin: [
-        process.env.FRONTEND_URL || 'http://localhost:3000',
-        "http://localhost:3001",
-    ],
-    methods: "GET,POST,PUT,PATCH,DELETE",
-    credentials: true
-}));
-
 // ✅ UPDATED CORS configuration with correct Vercel URLs
-// const allowedOrigins = [
-//     process.env.FRONTEND_URL || 'http://localhost:3000',
-//     'https://blog-app-martins-projects-bc0a9779.vercel.app',
-//     'https://blog-app-git-develop2-martins-projects-bc0a9779.vercel.app',
-//     'https://blog-pa9jixin6-martins-projects-bc0a9779.vercel.app',
-//     'http://localhost:3001',
-//     'http://127.0.0.1:3000'
-// ];
+const allowedOrigins = [
+    'https://martin-blogs-app.netlify.app',
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000'
+];
 
 // ✅ Handle preflight requests BEFORE other middleware
-// app.options('*', cors({
-//     origin: allowedOrigins,
-//     credentials: true,
-//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-//     optionsSuccessStatus: 200
-// }));
+app.options('*', cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200
+}));
 
 // ✅ Main CORS configuration
-// app.use(cors({
-//     origin: function (origin, callback) {
-//         // Allow requests with no origin (mobile apps, curl, etc.)
-//         if (!origin) return callback(null, true);
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
 
-//         if (allowedOrigins.includes(origin)) {
-//             console.log('✅ CORS allowed origin:', origin);
-//             callback(null, true);
-//         } else {
-//             console.log('❌ CORS blocked origin:', origin);
-//             console.log('✅ Allowed origins:', allowedOrigins);
-//             callback(new Error('Not allowed by CORS'));
-//         }
-//     },
-//     credentials: true,
-//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-//     optionsSuccessStatus: 200
-// }));
+        if (allowedOrigins.includes(origin)) {
+            console.log('✅ CORS allowed origin:', origin);
+            callback(null, true);
+        } else {
+            console.log('❌ CORS blocked origin:', origin);
+            console.log('✅ Allowed origins:', allowedOrigins);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200
+}));
 
 // ✅ Global middleware setup (order matters!)
 app.use(setSecurityHeaders); // Security headers after CORS
@@ -118,5 +107,5 @@ app.listen(port, () => {
     connectdb();
     console.log(`🚀 Server is running on port ${port}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    // console.log(`✅ Allowed CORS origins:`, allowedOrigins);
+    console.log(`✅ Allowed CORS origins:`, allowedOrigins);
 });
