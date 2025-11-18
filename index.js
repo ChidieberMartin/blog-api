@@ -21,7 +21,6 @@ const allowedOrigins = [
     'https://blog-app-martins-projects-bc0a9779.vercel.app',
     'https://blog-app-git-develop2-martins-projects-bc0a9779.vercel.app',
     'https://blog-pa9jixin6-martins-projects-bc0a9779.vercel.app',
-    'http://localhost:3000',
     'http://localhost:3001',
     'http://127.0.0.1:3000'
 ];

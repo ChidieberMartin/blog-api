@@ -1,5 +1,7 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
+const dotenv = require('dotenv');
+dotenv.confiq();
 
 class EmailService {
     constructor() {
@@ -8,17 +10,21 @@ class EmailService {
     }
 
     createTransporter() {
+        console.log('Creating email transporter...');
+        console.log('Environment:', process.env.NODE_ENV);
+        console.log('Email user:', process.env.EMAIL_USER ? 'Set' : 'Not set');
+        console.log('Email pass:', process.env.EMAIL_PASS ? 'Set' : 'Not set');
         // Different transporter configurations based on environment
         if (process.env.NODE_ENV === 'production') {
             // Production configuration (e.g., using SendGrid, AWS SES, etc.)
             this.transporter = nodemailer.createTransport({
-                service: 'SendGrid', // or 'gmail', 'outlook', etc.
+                service: 'gmail', // or 'gmail', 'outlook', etc.
                 auth: {
                     user: process.env.EMAIL_USER,
                     pass: process.env.EMAIL_PASS
                 }
             });
-        } else {
+        } else if (process.env.NODE_ENV === 'test') {
             // Development configuration
             this.transporter = nodemailer.createTransport({
                 service: 'gmail',
@@ -30,18 +36,38 @@ class EmailService {
                     rejectUnauthorized: false
                 }
             });
-        }
 
-        // Alternative: Using SMTP configuration
-        // this.transporter = nodemailer.createTransporter({
-        //     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        //     port: process.env.SMTP_PORT || 587,
-        //     secure: false, // true for 465, false for other ports
-        //     auth: {
-        //         user: process.env.EMAIL_USER,
-        //         pass: process.env.EMAIL_PASS
-        //     }
-        // });
+            this.transporter.verify(function (error, success) {
+                if (error) {
+                    console.log('Email transporter verification failed:', error);
+                } else {
+                    console.log('Email transporter is ready to send messages');
+                }
+            });
+        } else {
+
+            // Alternative: Using SMTP configuration
+            this.transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST || 'smtp.gmail.com',
+                port: process.env.SMTP_PORT || 587,
+                secure: true, // true for 465, false for other ports
+                auth: {
+                    user: process.env.EMAIL_USER,
+                    pass: process.env.EMAIL_PASS
+                },
+                tls: {
+                    rejectUnauthorized: true
+                }
+            });
+
+            this.transporter.verify(function (error, success) {
+                if (error) {
+                    console.log('Email transporter verification failed:', error);
+                } else {
+                    console.log('Email transporter is ready to send messages');
+                }
+            });
+        }
     }
 
     /**
@@ -50,7 +76,21 @@ class EmailService {
      * @returns {Promise<Object>} Email send result
      */
     async sendEmail(options) {
+        console.log('=== EMAIL SEND DEBUG ===');
+        console.log('Attempting to send email to:', options.to);
+        console.log('Email subject:', options.subject);
+        console.log('From email:', process.env.EMAIL_USER);
+        console.log('Transporter ready:', this.transporter ? 'Yes' : 'No');
         try {
+            console.log('Attempting to send email to:', options.to);
+            console.log('Email subject:', options.subject);
+            console.log('=== EMAIL SEND DEBUG ===');
+            console.log('Attempting to send email to:', options.to);
+            console.log('Email subject:', options.subject);
+            console.log('From email:', process.env.EMAIL_USER);
+            console.log('Transporter ready:', this.transporter ? 'Yes' : 'No');
+
+
             const mailOptions = {
                 from: `${process.env.APP_NAME || 'Blog App'} <${process.env.EMAIL_USER}>`,
                 to: options.to,
@@ -60,9 +100,10 @@ class EmailService {
                 attachments: options.attachments || []
             };
 
+            console.log('Mail options configured');
             const result = await this.transporter.sendMail(mailOptions);
             console.log('Email sent successfully:', result.messageId);
-            
+
             return {
                 success: true,
                 messageId: result.messageId,
@@ -70,11 +111,16 @@ class EmailService {
             };
         } catch (error) {
             console.error('Email sending failed:', error);
-            
+            console.error('Detailed email sending error:');
+            console.error('Error message:', error.message);
+            console.error('Error code:', error.code);
+            console.error('Error stack:', error.stack);
+
             return {
                 success: false,
                 error: error.message,
-                message: 'Failed to send email'
+                message: 'Failed to send email',
+                errorCode: error.code
             };
         }
     }
@@ -86,7 +132,7 @@ class EmailService {
      */
     async sendWelcomeEmail(user) {
         const subject = `Welcome to ${process.env.APP_NAME || 'Blog App'}!`;
-        
+
         const text = `
             Hi ${user.name},
 
@@ -149,7 +195,7 @@ class EmailService {
     async sendPasswordResetEmail(user, resetToken) {
         const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
         const subject = 'Password Reset Request';
-        
+
         const text = `
             Hi ${user.name},
 
@@ -220,7 +266,7 @@ class EmailService {
     async sendEmailVerification(user, verificationToken) {
         const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email/${verificationToken}`;
         const subject = 'Please verify your email address';
-        
+
         const text = `
             Hi ${user.name},
 
@@ -288,7 +334,7 @@ class EmailService {
     async sendNewBlogNotification(user, blog, author) {
         const blogUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/blogs/${blog._id}`;
         const subject = `New blog post: ${blog.title}`;
-        
+
         const text = `
             Hi ${user.name},
 
@@ -344,10 +390,16 @@ class EmailService {
         try {
             await this.transporter.verify();
             console.log('Email service connection successful');
-            return { success: true, message: 'Email service is ready' };
+            return {
+                success: true,
+                message: 'Email service is ready'
+            };
         } catch (error) {
             console.error('Email service connection failed:', error);
-            return { success: false, error: error.message };
+            return {
+                success: false,
+                error: error.message
+            };
         }
     }
 }

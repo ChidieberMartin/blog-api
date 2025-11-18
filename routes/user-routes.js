@@ -1,4 +1,6 @@
 const express = require("express");
+const dotenv = require('dotenv')
+dotenv.config();
 const {
   getAllUsers,
   signup,
@@ -30,7 +32,67 @@ const {
   requestLogger
 } = require("../middleware/auth");
 
+
 const router = express.Router();
+
+// Add this to your user controller or create a separate test controller
+
+/**
+ * Test email sending endpoint - REMOVE THIS IN PRODUCTION
+ */
+router.post('/test-email', async (req, res) => {
+  try {
+    const {
+      to
+    } = req.body;
+    const testEmail = to || process.env.EMAIL_USER; // Send to yourself if no recipient provided
+
+    console.log('Testing email to:', testEmail);
+
+
+    const result = await emailService.sendEmail({
+      to: testEmail,
+      subject: 'Test Email - ' + new Date().toISOString(),
+      text: 'This is a test email sent at ' + new Date().toISOString() + '. Your email service is working!',
+      html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #28a745;">🎉 Email Service Test Successful!</h2>
+                    <p>This test email was sent at: <strong>${new Date().toISOString()}</strong></p>
+                    <p>If you received this email, your email service is configured correctly!</p>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <h3>Configuration Used:</h3>
+                        <ul>
+                            <li>✅ Gmail SMTP</li>
+                            <li>✅ Port 465 (SSL)</li>
+                            <li>✅ Authentication working</li>
+                        </ul>
+                    </div>
+                    <p style="color: #666; font-size: 12px;">
+                        Remember to remove the test endpoint in production!
+                    </p>
+                </div>
+            `
+    });
+
+    console.log('Test email result:', result);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Test email processed',
+      emailSent: result.success,
+      result
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Test email failed',
+      error: error.message
+    });
+  }
+});
+
+
 
 // ✅ Apply request logging to all routes (optional)
 router.use(requestLogger);

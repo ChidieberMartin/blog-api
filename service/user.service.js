@@ -32,7 +32,9 @@ const createUserWithWelcomeEmail = async (userData, sendWelcomeEmail = true) => 
         let emailResult = null;
         if (sendWelcomeEmail) {
             emailResult = await emailService.sendWelcomeEmail(user);
+            console.log("email Result",emailResult)
         }
+        console.log("email Result2",emailResult)
         
         return {
             user,
